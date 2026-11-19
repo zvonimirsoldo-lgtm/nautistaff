@@ -1,0 +1,47 @@
+NAUTISTAFF LIVE - prva verzija aplikacije (test na Android mobitelima)
+=====================================================================
+
+Sve naredbe se upisuju u PowerShell (Start -> upišite "PowerShell").
+
+1) NAPRAVITE PRAZAN EXPO PROJEKT (samo prvi put)
+
+   cd $HOME\Documents
+   npx create-expo-app@latest nautistaff --template blank-typescript
+
+   (ako pita "Ok to proceed? (y)", upišite y i Enter; traje 1-3 minute)
+
+2) INSTALIRAJTE DODATKE KOJE APLIKACIJA KORISTI
+
+   cd nautistaff
+   npx expo install @supabase/supabase-js @react-native-async-storage/async-storage react-native-url-polyfill react-native-safe-area-context
+
+3) UBACITE DATOTEKE IZ OVE ZIP DATOTEKE
+
+   Desni klik na zip -> "Extract All..." -> odaberite mapu Documents\nautistaff
+   Kad pita, potvrdite zamjenu datoteke App.tsx.
+   U mapi nautistaff sada trebaju biti: App.tsx, mapa src, i ostalo što je Expo napravio.
+
+4) POKRENITE APLIKACIJU
+
+   npx expo start
+
+   - Ako Windows pita za vatrozid (firewall), kliknite "Allow" / "Dopusti".
+   - Na mobitelu otvorite Expo Go -> "Scan QR code" -> skenirajte QR kod iz PowerShella.
+   - Mobitel i računalo moraju biti na ISTOJ Wi-Fi mreži.
+   - Ako se mobitel ne može spojiti, zaustavite s Ctrl+C i pokrenite:
+       npx expo start --tunnel
+     (prvi put pita da instalira dodatak, potvrdite s y)
+
+5) TESTIRANJE (najbolje s 2 mobitela)
+
+   Mobitel A: Nova registracija -> Poslodavac -> upišite tvrtku -> Objava -> objavite ponudu
+   Mobitel B: Nova registracija -> Posada -> ponuda se pojavljuje sama, s odbrojavanjem
+   Mobitel B: "Prijavi se odmah"
+   Mobitel A: kandidat se pojavljuje sam -> "Prihvati"
+   Mobitel B: stiže obavijest "Prihvaćeni ste!"
+
+   S jednim mobitelom: Odjava pa prijava drugim računom (Profil -> Odjava).
+
+KAD MIJENJATE KOD: spremite datoteku, aplikacija na mobitelu se osvježi sama.
+ZAUSTAVLJANJE: Ctrl+C u PowerShellu.
+SLJEDEĆI PUT: cd $HOME\Documents\nautistaff  pa  npx expo start
