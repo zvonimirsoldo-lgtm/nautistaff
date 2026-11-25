@@ -1,8 +1,8 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { Badge, Btn, Card } from '../components';
 import { C } from '../theme';
-import { formatCountdown, formatDateTime, formatPay, parseTs } from '../utils';
+import { formatCountdown, formatPay, formatRange, parseTs } from '../utils';
 
 export type FeedJob = {
   id: string;
@@ -14,6 +14,7 @@ export type FeedJob = {
   vessel: string;
   location_name: string;
   start_at: string;
+  end_at: string | null;
   duration: string;
   licence: string;
   spots: number;
@@ -26,6 +27,7 @@ export type FeedJob = {
   expires_at: string;
   distance_km: number | null;
   my_application_status: string | null;
+  conflict: string | null;   // opis preklapanja sa zauzetim terminom, ili null
 };
 
 export default function JobCard(props: {
@@ -36,6 +38,7 @@ export default function JobCard(props: {
   const urgent = left < 15 * 60 * 1000;
   const spotsLeft = j.spots - j.filled;
   const st = j.my_application_status;
+  const busy = !!j.conflict && st !== 'pending' && st !== 'accepted';
 
   const border = j.is_vip ? { borderColor: C.amber, borderWidth: 2 } : j.is_live ? { borderColor: 'rgba(56,189,248,0.5)' } : {};
 
@@ -59,7 +62,7 @@ export default function JobCard(props: {
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
         <Info text={`📍 ${j.location_name}${j.distance_km != null ? ` (${Math.round(j.distance_km)} km)` : ''}`} />
-        <Info text={`📅 ${formatDateTime(j.start_at)}`} />
+        <Info text={`📅 ${formatRange(j.start_at, j.end_at)}`} />
         {j.duration ? <Info text={`⏳ ${j.duration}`} /> : null}
         {j.licence ? <Info text={`🪪 ${j.licence}`} /> : null}
         <Info text={`👥 ${spotsLeft} ${spotsLeft === 1 ? 'mjesto' : 'mjesta'}`} />
@@ -75,6 +78,13 @@ export default function JobCard(props: {
         </Text>
       </View>
 
+      {busy ? (
+        <View style={{ marginTop: 8, padding: 8, borderRadius: 12, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.5)' }}>
+          <Text style={{ color: C.red, fontWeight: '800', fontSize: 12 }}>⛔ U ovom terminu ste već zauzeti</Text>
+          <Text style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>Preklapa se s {j.conflict}.</Text>
+        </View>
+      ) : null}
+
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border }}>
         <View>
           <Text style={{ color: C.green, fontWeight: '900', fontSize: 15 }}>{formatPay(j.pay_amount, j.pay_unit)}</Text>
@@ -83,6 +93,12 @@ export default function JobCard(props: {
         {st === 'pending' ? <Text style={{ color: C.sky, fontWeight: '800' }}>⏳ Prijava poslana</Text>
           : st === 'accepted' ? <Text style={{ color: C.green, fontWeight: '900' }}>✔ Prihvaćeni ste!</Text>
           : st === 'rejected' ? <Text style={{ color: C.dim, fontWeight: '700' }}>Nije odabrano</Text>
+          : busy ? (
+            <Btn
+              title="Termin zauzet" small variant="ghost"
+              onPress={() => Alert.alert('Termin je zauzet', `Ovaj posao se vremenski preklapa s ${j.conflict}. Prijava nije moguća.`)}
+            />
+          )
           : <Btn title="⚡ PRIJAVI SE ODMAH" small variant={j.is_vip ? 'gold' : 'primary'} loading={props.applying} onPress={props.onApply} />}
       </View>
     </Card>

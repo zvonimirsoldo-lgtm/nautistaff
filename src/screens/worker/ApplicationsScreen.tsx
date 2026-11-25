@@ -3,15 +3,15 @@ import { Alert, Text, View } from 'react-native';
 import { supabase } from '../../supabase';
 import { Badge, Btn, Card, Empty, Screen, Title } from '../../components';
 import { C } from '../../theme';
-import { errorText, formatDateTime, formatPay, one } from '../../utils';
+import { errorText, formatPay, formatRange, one } from '../../utils';
 import ContactBox from '../../contact';
 
 type Row = {
   id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'cancelled';
   created_at: string;
   jobs: {
-    title: string; location_name: string; start_at: string; pay_amount: number; pay_unit: string;
+    title: string; location_name: string; start_at: string; end_at: string; pay_amount: number; pay_unit: string;
     companies: { name: string } | { name: string }[] | null;
   } | null;
 };
@@ -21,6 +21,7 @@ const STATUS = {
   accepted: { text: 'Prihvaćeno', color: C.green },
   rejected: { text: 'Nije odabrano', color: C.dim },
   withdrawn: { text: 'Povučeno', color: C.dim },
+  cancelled: { text: 'Otkazano', color: C.dim },
 };
 
 export default function ApplicationsScreen(props: { userId: string; refreshKey: number }) {
@@ -31,7 +32,7 @@ export default function ApplicationsScreen(props: { userId: string; refreshKey: 
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('applications')
-      .select('id, status, created_at, jobs(title, location_name, start_at, pay_amount, pay_unit, companies(name))')
+      .select('id, status, created_at, jobs(title, location_name, start_at, end_at, pay_amount, pay_unit, companies(name))')
       .eq('worker_id', props.userId)
       .neq('status', 'withdrawn')
       .order('created_at', { ascending: false });
@@ -65,7 +66,12 @@ export default function ApplicationsScreen(props: { userId: string; refreshKey: 
                 <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
                   {company?.name} · {job?.location_name}
                 </Text>
-                {job ? <Text style={{ color: C.muted, fontSize: 12 }}>📅 {formatDateTime(job.start_at)} · {formatPay(job.pay_amount, job.pay_unit)}</Text> : null}
+                {job ? <Text style={{ color: C.muted, fontSize: 12 }}>📅 {formatRange(job.start_at, job.end_at)} · {formatPay(job.pay_amount, job.pay_unit)}</Text> : null}
+                {r.status === 'cancelled' && (
+                  <Text style={{ color: C.dim, fontSize: 12, marginTop: 4 }}>
+                    Prijava je automatski otkazana jer ste u istom terminu prihvaćeni na drugom poslu.
+                  </Text>
+                )}
                 {r.status === 'accepted' && (
                   <>
                     <Text style={{ color: C.green, fontSize: 12, marginTop: 6 }}>

@@ -120,6 +120,26 @@ export function VerifiedBadge(props: { small?: boolean }) {
   );
 }
 
+// ---------- Sklopivi okvir (otvara se dodirom na naslov) ----------
+export function Section(props: { title: string; subtitle?: string; initiallyOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(!!props.initiallyOpen);
+  return (
+    <View style={[s.card, { padding: 0, overflow: 'hidden' }]}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', padding: 14, opacity: pressed ? 0.7 : 1 })}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: C.text, fontWeight: '900', fontSize: 15 }}>{props.title}</Text>
+          {props.subtitle ? <Text style={{ color: C.dim, fontSize: 11, marginTop: 2 }}>{props.subtitle}</Text> : null}
+        </View>
+        <Text style={{ color: C.sky, fontSize: 18, fontWeight: '900' }}>{open ? '▾' : '▸'}</Text>
+      </Pressable>
+      {open ? <View style={{ paddingHorizontal: 12, paddingBottom: 12, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 12 }}>{props.children}</View> : null}
+    </View>
+  );
+}
+
 // ---------- Kartica, oznaka, prazno stanje ----------
 export function Card(props: { children: React.ReactNode; style?: ViewStyle | ViewStyle[] }) {
   return <View style={[s.card, props.style as ViewStyle]}>{props.children}</View>;

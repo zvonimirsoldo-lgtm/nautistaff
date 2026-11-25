@@ -39,6 +39,25 @@ export function formatDateTime(value: string): string {
   return `${DAYS[d.getDay()]}, ${d.getDate()}.${d.getMonth() + 1}. u ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// "sub, 29.11. 17:00 → sub, 6.12. 17:00" (ili kraće ako je isti dan)
+export function formatRange(startIso: string, endIso: string | null | undefined): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  const s = new Date(parseTs(startIso));
+  const part = (d: Date) => `${DAYS[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}. ${p(d.getHours())}:${p(d.getMinutes())}`;
+  if (!endIso) return part(s);
+  const e = new Date(parseTs(endIso));
+  if (sameDay(s, e)) return `${part(s)}–${p(e.getHours())}:${p(e.getMinutes())}`;
+  return `${part(s)} → ${part(e)}`;
+}
+
+export function daysLabel(n: number): string {
+  return n % 10 === 1 && n % 100 !== 11 ? `${n} dan` : `${n} dana`;
+}
+
 export function formatPay(amount: number, unit: string): string {
   const label = unit === 'week' ? '/ tjedan' : unit === 'month' ? '/ mjesečno' : '/ dan';
   return `${Math.round(Number(amount))} € ${label}`;

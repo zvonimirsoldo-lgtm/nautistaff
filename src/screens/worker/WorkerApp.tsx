@@ -56,7 +56,7 @@ export default function WorkerApp(props: { userId: string }) {
         {tab === 'feed' && <FeedScreen userId={props.userId} loc={loc} locAsked={locAsked} onRequestLocation={updateLocation} />}
         {tab === 'apps' && <ApplicationsScreen userId={props.userId} refreshKey={refreshKey} />}
         {tab === 'licences' && <LicencesScreen userId={props.userId} />}
-        {tab === 'profile' && <WorkerProfileScreen userId={props.userId} />}
+        {tab === 'profile' && <WorkerProfileScreen userId={props.userId} refreshKey={refreshKey} />}
       </View>
       <TabBar
         tabs={[

@@ -5,7 +5,7 @@ import { Btn, Chips, Field, Screen, Title, Toggle } from '../../components';
 import { getMyLocation } from '../../location';
 import { PLACES } from '../../places';
 import { C } from '../../theme';
-import { CATEGORIES, errorText } from '../../utils';
+import { CATEGORIES, daysLabel, errorText, formatRange } from '../../utils';
 
 const DAY_NAMES = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub'];
 
@@ -38,7 +38,7 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
   const [location, setLocation] = useState('');   // detalj: marina / vez
   const [day, setDay] = useState(1);
   const [time, setTime] = useState('17:00');
-  const [duration, setDuration] = useState('7 dana');
+  const [days, setDays] = useState('7');   // trajanje u danima (za kalendar i provjeru preklapanja)
   const [spots, setSpots] = useState('1');
   const [pay, setPay] = useState('');
   const [payUnit, setPayUnit] = useState('day');
@@ -59,6 +59,10 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
     const start = new Date();
     start.setDate(start.getDate() + day);
     start.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    const daysNum = parseInt(days, 10);
+    if (!(daysNum >= 1 && daysNum <= 365)) return Alert.alert('Trajanje upišite kao broj dana (1–365).');
+    const end = new Date(start);
+    end.setDate(end.getDate() + daysNum);
     if (start.getTime() < Date.now()) return Alert.alert('Polazak je u prošlosti. Odaberite kasnije vrijeme.');
     const expires = new Date(Date.now() + deadline * 60 * 1000);
 
@@ -77,7 +81,8 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
       lat: coords?.lat ?? null,
       lng: coords?.lng ?? null,
       start_at: start.toISOString(),
-      duration: duration.trim(),
+      end_at: end.toISOString(),
+      duration: daysLabel(daysNum),
       licence: licence.trim(),
       spots: spotsNum,
       pay_amount: payNum,
@@ -121,9 +126,10 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
       <Chips label="Dan polaska" options={dayOptions()} value={day} onChange={setDay} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}><Field label="Sat polaska" value={time} onChangeText={setTime} placeholder="17:00" /></View>
-        <View style={{ flex: 1 }}><Field label="Trajanje" value={duration} onChangeText={setDuration} placeholder="7 dana" /></View>
+        <View style={{ flex: 1 }}><Field label="Trajanje (dana)" value={days} onChangeText={setDays} keyboardType="number-pad" maxLength={3} placeholder="7" /></View>
         <View style={{ flex: 1 }}><Field label="Broj osoba" value={spots} onChangeText={setSpots} keyboardType="number-pad" /></View>
       </View>
+      <PeriodPreview day={day} time={time} days={days} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}><Field label="Plaća (€)" value={pay} onChangeText={setPay} keyboardType="decimal-pad" placeholder="180" /></View>
         <View style={{ flex: 1.4 }}>
@@ -141,5 +147,22 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
         Ponuda se odmah pojavljuje u aplikaciji, a posada u krugu 30 km koja radi to zanimanje dobiva push obavijest.
       </Text>
     </Screen>
+  );
+}
+
+// Prikaz razdoblja posla dok poslodavac ispunjava obrazac, npr. "sub 29.11. 17:00 → sub 6.12. 17:00"
+function PeriodPreview(props: { day: number; time: string; days: string }) {
+  const m = props.time.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  const n = parseInt(props.days, 10);
+  if (!m || !(n >= 1 && n <= 365)) return null;
+  const start = new Date();
+  start.setDate(start.getDate() + props.day);
+  start.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + n);
+  return (
+    <Text style={{ color: C.sky, fontSize: 12, marginTop: -4, marginBottom: 10 }}>
+      📅 Razdoblje posla: {formatRange(start.toISOString(), end.toISOString())}
+    </Text>
   );
 }

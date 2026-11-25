@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { supabase } from '../../supabase';
-import { Btn, Card, Field, MultiChips, Screen, Title, Toggle, useToast, VerifiedBadge } from '../../components';
+import { Btn, Card, Field, MultiChips, Screen, Section, Title, Toggle, useToast, VerifiedBadge } from '../../components';
+import CalendarSection from './CalendarSection';
 import { useAuth } from '../../auth';
 import { openStored, pickFile, uploadFile } from '../../files';
 import { logout } from '../../push';
@@ -9,7 +10,7 @@ import { C } from '../../theme';
 import { versionLabel } from '../../updates';
 import { CATEGORIES, errorText } from '../../utils';
 
-export default function WorkerProfileScreen(props: { userId: string }) {
+export default function WorkerProfileScreen(props: { userId: string; refreshKey?: number }) {
   const { profile, reloadProfile } = useAuth();
   const toast = useToast();
   const [form, setForm] = useState({ full_name: '', title: '', years: '', languages: '', vessels: '', bio: '', phone: '' });
@@ -114,25 +115,31 @@ export default function WorkerProfileScreen(props: { userId: string }) {
         </View>
       </Card>
 
-      <Title>Podaci koje poslodavac vidi</Title>
-      <Toggle label="Dostupan sam za posao (primam obavijesti)" value={available} onChange={setAvailable} />
-      <MultiChips
-        label="Zanimanja za koja primam obavijesti (prazno = sva)"
-        options={CATEGORIES.map((c) => ({ value: c.id, label: c.name }))}
-        values={categories}
-        onChange={setCategories}
-      />
-      <Field label="Ime i prezime" value={form.full_name} onChangeText={set('full_name')} />
-      <Field label="Zanimanje / titula" value={form.title} onChangeText={set('title')} placeholder="npr. Skiper na katamaranima" />
-      <Field label="Godine iskustva" value={form.years} onChangeText={set('years')} keyboardType="number-pad" maxLength={2} placeholder="npr. 6" />
-      <Field label="Strani jezici" value={form.languages} onChangeText={set('languages')} placeholder="npr. engleski C1, talijanski B2" />
-      <Field label="Brodovi i flote" value={form.vessels} onChangeText={set('vessels')} placeholder="npr. Lagoon 450, Bavaria C45" />
-      <Field label="O meni" value={form.bio} onChangeText={set('bio')} multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
+      <Section title="👤 Osobni podaci" subtitle="Zanimanja, iskustvo, jezici, kontakt">
+        <Toggle label="Dostupan sam za posao (primam obavijesti)" value={available} onChange={setAvailable} />
+        <MultiChips
+          label="Zanimanja za koja primam obavijesti (prazno = sva)"
+          options={CATEGORIES.map((c) => ({ value: c.id, label: c.name }))}
+          values={categories}
+          onChange={setCategories}
+        />
+        <Field label="Ime i prezime" value={form.full_name} onChangeText={set('full_name')} />
+        <Field label="Zanimanje / titula" value={form.title} onChangeText={set('title')} placeholder="npr. Skiper na katamaranima" />
+        <Field label="Godine iskustva" value={form.years} onChangeText={set('years')} keyboardType="number-pad" maxLength={2} placeholder="npr. 6" />
+        <Field label="Strani jezici" value={form.languages} onChangeText={set('languages')} placeholder="npr. engleski C1, talijanski B2" />
+        <Field label="Brodovi i flote" value={form.vessels} onChangeText={set('vessels')} placeholder="npr. Lagoon 450, Bavaria C45" />
+        <Field label="O meni" value={form.bio} onChangeText={set('bio')} multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
 
-      <Title>Kontakt</Title>
-      <Field label="Broj mobitela (vidi ga samo poslodavac koji vas prihvati)" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" placeholder="npr. 091 123 4567" />
+        <Title>Kontakt</Title>
+        <Field label="Broj mobitela (vidi ga samo poslodavac koji vas prihvati)" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" placeholder="npr. 091 123 4567" />
 
-      <Btn title="Spremi profil" variant="green" onPress={save} loading={saving} />
+        <Btn title="Spremi profil" variant="green" onPress={save} loading={saving} />
+      </Section>
+
+      <Section title="📅 Moj kalendar" subtitle="Zauzeti i slobodni termini">
+        <CalendarSection userId={props.userId} refreshKey={props.refreshKey} />
+      </Section>
+
       <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />
       <Text style={{ color: C.dim, fontSize: 10, textAlign: 'center', marginTop: 12 }}>Verzija aplikacije: {versionLabel()}</Text>
     </Screen>

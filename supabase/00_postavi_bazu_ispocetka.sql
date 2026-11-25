@@ -11,6 +11,7 @@ drop policy if exists "files_own_rw" on storage.objects;
 drop policy if exists "cv_employer_read" on storage.objects;
 drop policy if exists "certs_admin_read" on storage.objects;
 
+drop table if exists public.worker_unavailability cascade;
 drop table if exists public.private_contacts cascade;
 drop table if exists public.push_tokens     cascade;
 drop table if exists public.applications    cascade;
@@ -40,6 +41,8 @@ drop function if exists public.register_push_token(text, text) cascade;
 drop function if exists public.send_push(uuid[], text, text, jsonb) cascade;
 drop function if exists public.notify_new_job()           cascade;
 drop function if exists public.notify_application()       cascade;
+drop function if exists public.booking_conflict(uuid, timestamptz, timestamptz, uuid) cascade;
+drop function if exists public.set_job_end()              cascade;
 
 -- =====================================================================
 -- NautiStaff Live: baza podataka za Supabase
@@ -116,6 +119,7 @@ create table public.jobs (
     lat           double precision,
     lng           double precision,
     start_at      timestamptz not null,
+    end_at        timestamptz not null,     -- kraj posla (za kalendar i provjeru preklapanja)
     duration      text not null default '',
     licence       text not null default '',
     spots         int not null default 1 check (spots between 1 and 50),
@@ -129,6 +133,7 @@ create table public.jobs (
     status        text not null default 'active' check (status in ('active', 'filled', 'closed')),
     created_at    timestamptz not null default now(),
     check (filled <= spots),
+    constraint jobs_end_after_start check (end_at > start_at and end_at <= start_at + interval '366 days'),
     check (expires_at > created_at)
 );
 
@@ -140,7 +145,10 @@ create table public.applications (
     id          uuid primary key default gen_random_uuid(),
     job_id      uuid not null references public.jobs(id) on delete cascade,
     worker_id   uuid not null references public.profiles(id) on delete cascade,
-    status      text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'withdrawn')),
+    status      text not null default 'pending'
+                constraint applications_status_check
+                check (status in ('pending', 'accepted', 'rejected', 'withdrawn', 'cancelled')),
+                -- cancelled = automatski otkazano jer je radnik prihvaćen na drugom poslu u istom terminu
     created_at  timestamptz not null default now(),
     decided_at  timestamptz,
     unique (job_id, worker_id)
@@ -161,6 +169,13 @@ create table public.private_contacts (
     user_id     uuid primary key references public.profiles(id) on delete cascade,
     phone       text not null default '' check (length(phone) <= 30),
     updated_at  timestamptz not null default now()
+);
+
+-- Dani koje je radnik u kalendaru označio kao nedostupne (godišnji, privatne obveze...)
+create table public.worker_unavailability (
+    user_id     uuid not null references public.profiles(id) on delete cascade,
+    day         date not null,
+    primary key (user_id, day)
 );
 
 
@@ -342,14 +357,62 @@ create trigger protect_jobs before insert or update on public.jobs
 -- Sve provjere roka i broja mjesta rade se na serveru, ne na mobitelu.
 -- ---------------------------------------------------------------------
 
+-- Kraj posla: ako ga aplikacija ne pošalje, izračuna se iz trajanja ("7 dana" -> +7 dana)
+create or replace function public.set_job_end()
+returns trigger
+language plpgsql set search_path = public
+as $$
+begin
+    if new.end_at is null then
+        new.end_at := new.start_at + make_interval(days => greatest(1, least(365,
+            coalesce(nullif(substring(new.duration from '\d+'), '')::int, 1))));
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists jobs_set_end on public.jobs;
+create trigger jobs_set_end before insert on public.jobs
+    for each row execute function public.set_job_end();
+
+-- Je li radnik zauzet u zadanom terminu? Vraća opis preklapanja ili NULL ako je slobodan.
+-- Zauzet = već PRIHVAĆEN na drugom poslu u tom terminu, ili je taj dan sam označio kao nedostupan.
+create or replace function public.booking_conflict(p_worker uuid, p_start timestamptz, p_end timestamptz,
+                                                   p_exclude_job uuid default null)
+returns text
+language sql stable security definer set search_path = public
+as $$
+    select coalesce(
+        (select 'poslom „' || j.title || '" (' || c.name || ', '
+                || to_char(j.start_at at time zone 'Europe/Zagreb', 'FMDD.FMMM.') || ' – '
+                || to_char(j.end_at at time zone 'Europe/Zagreb', 'FMDD.FMMM.') || ')'
+           from public.applications a
+           join public.jobs j on j.id = a.job_id
+           join public.companies c on c.id = j.company_id
+          where a.worker_id = p_worker
+            and a.status = 'accepted'
+            and (p_exclude_job is null or j.id <> p_exclude_job)
+            and j.start_at < p_end and p_start < j.end_at
+          order by j.start_at
+          limit 1),
+        (select 'danom koji ste u kalendaru označili kao nedostupan (' || to_char(u.day, 'FMDD.FMMM.') || ')'
+           from public.worker_unavailability u
+          where u.user_id = p_worker
+            and (u.day::timestamp at time zone 'Europe/Zagreb') < p_end
+            and p_start < ((u.day + 1)::timestamp at time zone 'Europe/Zagreb')
+          order by u.day
+          limit 1));
+$$;
+
 -- Instant prijava radnika na oglas
 create or replace function public.apply_to_job(p_job_id uuid)
 returns uuid
 language plpgsql security definer set search_path = public
 as $$
 declare
-    v_job public.jobs;
-    v_id  uuid;
+    v_job      public.jobs;
+    v_id       uuid;
+    v_conflict text;
 begin
     if not exists (select 1 from public.profiles where id = auth.uid() and role = 'worker') then
         raise exception 'Samo posada se može prijaviti na oglas.';
@@ -363,34 +426,23 @@ begin
         raise exception 'Ponuda više nije aktivna.';
     end if;
 
+    -- ZAUZET TERMIN: ne može se prijaviti na posao koji se preklapa s već rezerviranim
+    v_conflict := public.booking_conflict(auth.uid(), v_job.start_at, v_job.end_at, v_job.id);
+    if v_conflict is not null then
+        raise exception 'Termin je zauzet. Ovaj posao se vremenski preklapa s %. Prijava nije moguća.', v_conflict;
+    end if;
+
     insert into public.applications (job_id, worker_id)
     values (p_job_id, auth.uid())
     on conflict (job_id, worker_id) do update
         set status = 'pending', created_at = now(), decided_at = null
-        where public.applications.status = 'withdrawn'
+        where public.applications.status in ('withdrawn', 'cancelled')
     returning id into v_id;
 
     if v_id is null then
         raise exception 'Već ste se prijavili na ovaj oglas.';
     end if;
     return v_id;
-end;
-$$;
-
--- Radnik povlači prijavu
-create or replace function public.withdraw_application(p_application_id uuid)
-returns void
-language plpgsql security definer set search_path = public
-as $$
-begin
-    update public.applications
-       set status = 'withdrawn', decided_at = now()
-     where id = p_application_id
-       and worker_id = auth.uid()
-       and status = 'pending';
-    if not found then
-        raise exception 'Prijava se ne može povući.';
-    end if;
 end;
 $$;
 
@@ -418,6 +470,10 @@ begin
         if v_job.status <> 'active' or v_job.expires_at <= now() or v_job.filled >= v_job.spots then
             raise exception 'Oglas više nije aktivan ili je popunjen.';
         end if;
+        -- kandidat je u međuvremenu možda prihvaćen na drugom poslu u istom terminu
+        if public.booking_conflict(v_app.worker_id, v_job.start_at, v_job.end_at, v_job.id) is not null then
+            raise exception 'Kandidat je u tom terminu već angažiran na drugom poslu ili nije dostupan. Odaberite drugog kandidata.';
+        end if;
 
         update public.applications set status = 'accepted', decided_at = now() where id = v_app.id;
 
@@ -427,32 +483,46 @@ begin
                status = case when filled + 1 >= spots then 'filled' else status end
          where id = v_job.id;
         perform set_config('app.trusted', 'off', true);
+
+        -- ostale prijave tog radnika koje se vremenski preklapaju automatski se otkazuju
+        update public.applications a
+           set status = 'cancelled', decided_at = now()
+          from public.jobs j
+         where a.job_id = j.id
+           and a.worker_id = v_app.worker_id
+           and a.status = 'pending'
+           and a.id <> v_app.id
+           and j.start_at < v_job.end_at and v_job.start_at < j.end_at;
     else
         update public.applications set status = 'rejected', decided_at = now() where id = v_app.id;
     end if;
 end;
 $$;
 
--- Live feed za radnika: aktivni oglasi, po želji samo u krugu X km
-create or replace function public.live_feed(p_lat double precision default null,
-                                            p_lng double precision default null,
-                                            p_radius_km double precision default null)
+-- Live feed za radnika: aktivni oglasi, po želji samo u krugu X km.
+-- "conflict" opisuje preklapanje s već rezerviranim terminom (tada se prijava ne nudi).
+drop function if exists public.live_feed(double precision, double precision, double precision);
+create function public.live_feed(p_lat double precision default null,
+                                 p_lng double precision default null,
+                                 p_radius_km double precision default null)
 returns table (
     id uuid, company_id uuid, company_name text, company_verified boolean, company_rating numeric,
-    category text, title text, vessel text, location_name text, start_at timestamptz,
+    category text, title text, vessel text, location_name text, start_at timestamptz, end_at timestamptz,
     duration text, licence text, spots int, filled int, pay_amount numeric, pay_unit text,
     tips boolean, is_live boolean, is_vip boolean, expires_at timestamptz, distance_km double precision,
-    my_application_status text
+    my_application_status text, conflict text
 )
 language sql stable security definer set search_path = public
 as $$
     select j.id, j.company_id, c.name, c.verified, c.rating,
-           j.category, j.title, j.vessel, j.location_name, j.start_at,
+           j.category, j.title, j.vessel, j.location_name, j.start_at, j.end_at,
            j.duration, j.licence, j.spots, j.filled, j.pay_amount, j.pay_unit,
            j.tips, j.is_live, j.is_vip, j.expires_at,
            case when p_lat is not null and j.lat is not null
                 then public.distance_km(p_lat, p_lng, j.lat, j.lng) end,
-           a.status
+           a.status,
+           case when a.status is null or a.status in ('withdrawn', 'cancelled')
+                then public.booking_conflict(auth.uid(), j.start_at, j.end_at, j.id) end
       from public.jobs j
       join public.companies c on c.id = j.company_id
       left join public.applications a on a.job_id = j.id and a.worker_id = auth.uid()
@@ -464,6 +534,24 @@ as $$
             or public.distance_km(p_lat, p_lng, j.lat, j.lng) <= p_radius_km)
      order by j.is_vip desc, j.is_live desc, j.expires_at asc;
 $$;
+
+-- Radnik povlači prijavu
+create or replace function public.withdraw_application(p_application_id uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+    update public.applications
+       set status = 'withdrawn', decided_at = now()
+     where id = p_application_id
+       and worker_id = auth.uid()
+       and status = 'pending';
+    if not found then
+        raise exception 'Prijava se ne može povući.';
+    end if;
+end;
+$$;
+
 
 
 -- ---------------------------------------------------------------------
@@ -616,7 +704,9 @@ begin
        and w.available
        and (cardinality(w.categories) = 0 or new.category = any(w.categories))
        and (w.lat is null or new.lat is null
-            or public.distance_km(w.lat, w.lng, new.lat, new.lng) <= 30);
+            or public.distance_km(w.lat, w.lng, new.lat, new.lng) <= 30)
+       -- ne šaljemo obavijest onima koji su u tom terminu već zauzeti
+       and public.booking_conflict(w.user_id, new.start_at, new.end_at, new.id) is null;
 
     if v_users is not null then
         perform public.send_push(
@@ -686,6 +776,7 @@ alter table public.jobs            enable row level security;
 alter table public.applications    enable row level security;
 alter table public.push_tokens     enable row level security;
 alter table public.private_contacts enable row level security;
+alter table public.worker_unavailability enable row level security;
 
 -- profiles: prijavljeni korisnici vide imena; svatko mijenja samo svoj
 create policy "profiles_select" on public.profiles for select to authenticated using (true);
@@ -740,6 +831,10 @@ create policy "push_own" on public.push_tokens for all to authenticated
 create policy "contact_own" on public.private_contacts for all to authenticated
     using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+-- worker_unavailability: radnik upravlja samo svojim kalendarom
+create policy "unavail_own" on public.worker_unavailability for all to authenticated
+    using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 
 -- ---------------------------------------------------------------------
 -- 7. DOZVOLE ZA RPC FUNKCIJE
@@ -767,6 +862,7 @@ grant execute on function public.register_push_token(text, text) to authenticate
 -- interne funkcije: ne smiju se pozivati iz aplikacije
 revoke execute on function public.send_push(uuid[], text, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.recompute_verified(uuid) from public, anon, authenticated;
+revoke execute on function public.booking_conflict(uuid, timestamptz, timestamptz, uuid) from public, anon, authenticated;
 
 
 -- ---------------------------------------------------------------------

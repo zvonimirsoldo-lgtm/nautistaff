@@ -5,11 +5,11 @@ import { Badge, Btn, Card, Empty, Screen, Title, VerifiedBadge } from '../../com
 import ContactBox from '../../contact';
 import { openStored } from '../../files';
 import { C } from '../../theme';
-import { errorText, formatCountdown, formatDateTime, formatPay, one, parseTs, useNow } from '../../utils';
+import { errorText, formatCountdown, formatPay, formatRange, one, parseTs, useNow } from '../../utils';
 
 type Applicant = {
   id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'cancelled';
   created_at: string;
   profiles: {
     full_name: string;
@@ -19,7 +19,7 @@ type Applicant = {
 type WP = { title: string; rating: number | null; verified: boolean; languages: string; experience_years: number | null; cv_path: string | null };
 
 type Job = {
-  id: string; title: string; location_name: string; start_at: string; pay_amount: number; pay_unit: string;
+  id: string; title: string; location_name: string; start_at: string; end_at: string; pay_amount: number; pay_unit: string;
   spots: number; filled: number; status: 'active' | 'filled' | 'closed'; expires_at: string; is_vip: boolean;
   applications: Applicant[];
 };
@@ -41,7 +41,7 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('jobs')
-      .select(`id, title, location_name, start_at, pay_amount, pay_unit, spots, filled, status, expires_at, is_vip,
+      .select(`id, title, location_name, start_at, end_at, pay_amount, pay_unit, spots, filled, status, expires_at, is_vip,
                applications(id, status, created_at, profiles(full_name, worker_profiles(title, rating, verified, languages, experience_years, cv_path)))`)
       .eq('company_id', props.companyId)
       .order('created_at', { ascending: false });
@@ -92,7 +92,7 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
                   <Badge text={st.text} color={st.color} />
                 </View>
                 <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
-                  📍 {job.location_name} · 📅 {formatDateTime(job.start_at)} · {formatPay(job.pay_amount, job.pay_unit)}
+                  📍 {job.location_name} · 📅 {formatRange(job.start_at, job.end_at)} · {formatPay(job.pay_amount, job.pay_unit)}
                 </Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                   <Text style={{ color: C.text, fontSize: 12 }}>Popunjeno: <Text style={{ fontWeight: '900' }}>{job.filled}/{job.spots}</Text></Text>
@@ -112,7 +112,7 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
                         return (
                           <View key={a.id} style={{
                             backgroundColor: C.bg, borderColor: C.border, borderWidth: 1, borderRadius: 12,
-                            padding: 10, marginBottom: 6, opacity: a.status === 'rejected' ? 0.5 : 1,
+                            padding: 10, marginBottom: 6, opacity: a.status === 'rejected' || a.status === 'cancelled' ? 0.5 : 1,
                           }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                               <Text style={{ color: C.text, fontWeight: '800' }}>{a.profiles?.full_name || 'Kandidat'}</Text>
@@ -140,7 +140,10 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
                                 marginTop: 4, fontSize: 12, fontWeight: '800',
                                 color: a.status === 'accepted' ? C.green : C.dim,
                               }}>
-                                {a.status === 'accepted' ? 'Prihvaćen' : a.status === 'rejected' ? 'Odbijen' : 'Nije odgovoreno'}
+                                {a.status === 'accepted' ? 'Prihvaćen'
+                                  : a.status === 'rejected' ? 'Odbijen'
+                                  : a.status === 'cancelled' ? 'U međuvremenu prihvatio drugi posao u tom terminu'
+                                  : 'Nije odgovoreno'}
                               </Text>
                             )}
                             {a.status === 'accepted' ? <ContactBox applicationId={a.id} label="KONTAKT KANDIDATA" /> : null}

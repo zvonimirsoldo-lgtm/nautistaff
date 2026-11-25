@@ -27,15 +27,20 @@ export default function FeedScreen(props: {
   const toast = useToast();
   const { loc } = props;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<FeedJob[]> => {
     const { data, error } = await supabase.rpc('live_feed', {
       p_lat: loc?.lat ?? null,
       p_lng: loc?.lng ?? null,
       p_radius_km: loc && radius > 0 ? radius : null,
     });
-    if (error) toast('Greška pri učitavanju: ' + error.message);
-    else setJobs((data ?? []) as FeedJob[]);
     setLoading(false);
+    if (error) {
+      toast('Greška pri učitavanju: ' + error.message);
+      return [];
+    }
+    const list = (data ?? []) as FeedJob[];
+    setJobs(list);
+    return list;
   }, [toast, loc, radius]);
 
   useEffect(() => {
@@ -43,10 +48,12 @@ export default function FeedScreen(props: {
     // REAL-TIME: svaka nova ili promijenjena ponuda odmah osvježava popis
     const channel = supabase
       .channel(`feed-${props.userId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, (payload) => {
-        const row = payload.new as { title?: string; location_name?: string };
-        toast(`⚡ Nova ponuda: ${row.title ?? ''}${row.location_name ? ` (${row.location_name})` : ''}`);
-        load();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, async (payload) => {
+        const id = (payload.new as { id?: string }).id;
+        const list = await load();
+        // javimo samo za ponude koje su u mom krugu i ne preklapaju se s mojim zauzetim terminom
+        const job = list.find((x) => x.id === id);
+        if (job && !job.conflict) toast(`⚡ Nova ponuda: ${job.title} (${job.location_name})`);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jobs' }, () => load())
       .subscribe();
