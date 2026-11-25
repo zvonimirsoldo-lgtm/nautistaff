@@ -6,6 +6,7 @@ import { LatLng } from '../../location';
 import { C } from '../../theme';
 import { CATEGORIES, errorText, parseTs, useNow } from '../../utils';
 import JobCard, { FeedJob } from '../JobCard';
+import ReportModal, { ReportTarget } from '../../report';
 
 const RADII = [
   { value: 0, label: 'Cijeli Jadran' },
@@ -23,6 +24,7 @@ export default function FeedScreen(props: {
   const [cat, setCat] = useState('all');
   const [radius, setRadius] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportTarget>(null);
   const now = useNow(1000);
   const toast = useToast();
   const { loc } = props;
@@ -89,7 +91,7 @@ export default function FeedScreen(props: {
       ) : props.locAsked ? (
         <Pressable onPress={props.onRequestLocation} style={{ marginBottom: 10 }}>
           <Text style={{ color: C.amberLight, fontSize: 12 }}>
-            📍 Lokacija nije uključena, pa ne možemo filtrirati po udaljenosti. Dodirnite za ponovni pokušaj.
+            📍 Lokacija nije uključena, pa ne možemo filtrirati po udaljenosti. Uključite je u Profil → Privatnost i račun, ili dodirnite za ponovni pokušaj.
           </Text>
         </Pressable>
       ) : null}
@@ -100,8 +102,12 @@ export default function FeedScreen(props: {
       {loading ? <Empty text="Učitavanje…" />
         : visible.length === 0 ? <Empty text={radius > 0 ? `Nema ponuda u krugu ${radius} km. Probajte veći krug.` : 'Trenutno nema aktivnih ponuda. Nove stižu automatski.'} />
         : visible.map((j) => (
-            <JobCard key={j.id} job={j} now={now} applying={applying === j.id} onApply={() => apply(j)} />
+            <JobCard
+              key={j.id} job={j} now={now} applying={applying === j.id} onApply={() => apply(j)}
+              onReport={() => setReport({ jobId: j.id, label: `Oglas: ${j.title} (${j.company_name})` })}
+            />
           ))}
+      <ReportModal target={report} onClose={() => setReport(null)} />
     </Screen>
   );
 }

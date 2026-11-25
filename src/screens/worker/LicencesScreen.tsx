@@ -5,6 +5,7 @@ import { Badge, Btn, Card, Chips, Empty, Field, Screen, Title, useToast, Verifie
 import { openStored, pickFile, uploadFile } from '../../files';
 import { C } from '../../theme';
 import { errorText } from '../../utils';
+import { HEALTH_CONSENT_TEXT } from '../../legal';
 
 const TYPES = ['Voditelj brodice', 'STCW', 'Sanitarna iskaznica', 'VHF / radio', 'Prva pomoć', 'Ostalo'];
 
@@ -54,6 +55,21 @@ export default function LicencesScreen(props: { userId: string }) {
   async function upload() {
     const exp = parseDate(expires);
     if (exp === 'invalid') return Alert.alert('Datum isteka upišite kao npr. 31.12.2027');
+    // ZDRAVSTVENI PODATAK: za sanitarnu iskaznicu tražimo izričitu privolu (GDPR čl. 9)
+    if (type.toLowerCase().includes('sanitarn')) {
+      const { data: p } = await supabase.from('profiles').select('health_consent_at').eq('id', props.userId).maybeSingle();
+      if (!p?.health_consent_at) {
+        const agreed = await new Promise<boolean>((resolve) => {
+          Alert.alert('Privola za zdravstvene podatke', HEALTH_CONSENT_TEXT, [
+            { text: 'Ne pristajem', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Pristajem', onPress: () => resolve(true) },
+          ], { cancelable: false });
+        });
+        if (!agreed) return;
+        const { error } = await supabase.rpc('set_health_consent', { p_consent: true });
+        if (error) return Alert.alert('Greška', errorText(error));
+      }
+    }
     try {
       const file = await pickFile(['application/pdf', 'image/*']);
       if (!file) return;

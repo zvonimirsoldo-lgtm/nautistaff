@@ -33,7 +33,7 @@ export type FeedJob = {
 };
 
 export default function JobCard(props: {
-  job: FeedJob; now: number; applying: boolean; onApply: () => void;
+  job: FeedJob; now: number; applying: boolean; onApply: () => void; onReport?: () => void;
 }) {
   const j = props.job;
   const left = parseTs(j.expires_at) - props.now;
@@ -114,6 +114,9 @@ export default function JobCard(props: {
           )
           : <Btn title="⚡ PRIJAVI SE ODMAH" small variant={j.is_vip ? 'gold' : 'primary'} loading={props.applying} onPress={props.onApply} />}
       </View>
+      {props.onReport ? (
+        <Text onPress={props.onReport} style={{ color: C.dim, fontSize: 11, marginTop: 8, alignSelf: 'flex-start' }}>⚑ Prijavi oglas</Text>
+      ) : null}
     </Card>
   );
 }

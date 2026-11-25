@@ -6,6 +6,7 @@ import { C } from '../../theme';
 import { versionLabel } from '../../updates';
 import { errorText } from '../../utils';
 import { logout } from '../../push';
+import { PrivacySection } from '../../privacy';
 import CompanySetupScreen from './CompanySetupScreen';
 import MyJobsScreen from './MyJobsScreen';
 import PostJobScreen, { RepostData } from './PostJobScreen';
@@ -129,6 +130,10 @@ function CompanyScreen(props: { company: Company; onSaved: () => void }) {
       <Field label="Baza / marina" value={base} onChangeText={setBase} />
       <Field label="Kontakt mobitel (vidi ga samo kandidat kojeg prihvatite)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="npr. 098 765 4321" />
       <Btn title="Spremi" variant="green" onPress={save} loading={saving} />
+
+      <Title>Privatnost i račun</Title>
+      <PrivacySection userId={c.owner_id} role="employer" />
+
       <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />
       <Text style={{ color: C.dim, fontSize: 10, textAlign: 'center', marginTop: 12 }}>Verzija aplikacije: {versionLabel()}</Text>
     </Screen>

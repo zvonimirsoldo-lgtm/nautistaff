@@ -5,6 +5,7 @@ import { Badge, Btn, Card, Chips, Empty, Screen, Title } from '../../components'
 import { C } from '../../theme';
 import { errorText, formatPay, formatRange, one, parseTs } from '../../utils';
 import ContactBox from '../../contact';
+import { WORKER_NOTICE } from '../../legal';
 
 type Row = {
   id: string;
@@ -105,6 +106,7 @@ export default function ApplicationsScreen(props: { userId: string; refreshKey: 
                       🎉 Poslodavac vas je odabrao. Javite se za dogovor oko ukrcaja:
                     </Text>
                     <ContactBox applicationId={r.id} label="KONTAKT POSLODAVCA" />
+                    <Text style={{ color: C.dim, fontSize: 11, marginTop: 6, lineHeight: 16 }}>⚖️ {WORKER_NOTICE}</Text>
                   </>
                 )}
                 {r.status === 'pending' && view === 'current' && (

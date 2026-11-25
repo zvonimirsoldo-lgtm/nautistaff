@@ -3,6 +3,7 @@ import { Alert, Text, View } from 'react-native';
 import { supabase } from '../../supabase';
 import { Btn, Card, Field, MultiChips, Screen, Section, Title, Toggle, useToast, VerifiedBadge } from '../../components';
 import CalendarSection from './CalendarSection';
+import { PrivacySection } from '../../privacy';
 import { useAuth } from '../../auth';
 import { openStored, pickFile, uploadFile } from '../../files';
 import { logout } from '../../push';
@@ -10,7 +11,7 @@ import { C } from '../../theme';
 import { versionLabel } from '../../updates';
 import { CATEGORIES, errorText } from '../../utils';
 
-export default function WorkerProfileScreen(props: { userId: string; refreshKey?: number }) {
+export default function WorkerProfileScreen(props: { userId: string; refreshKey?: number; onLocationChanged?: () => void }) {
   const { profile, reloadProfile } = useAuth();
   const toast = useToast();
   const [form, setForm] = useState({ full_name: '', title: '', years: '', languages: '', vessels: '', bio: '', phone: '' });
@@ -138,6 +139,10 @@ export default function WorkerProfileScreen(props: { userId: string; refreshKey?
 
       <Section title="📅 Moj kalendar" subtitle="Zauzeti i slobodni termini">
         <CalendarSection userId={props.userId} refreshKey={props.refreshKey} />
+      </Section>
+
+      <Section title="🔒 Privatnost i račun" subtitle="Uvjeti, lokacija, privole, moji podaci, brisanje računa">
+        <PrivacySection userId={props.userId} role="worker" onLocationChanged={props.onLocationChanged} />
       </Section>
 
       <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />

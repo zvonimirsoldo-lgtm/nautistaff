@@ -20,6 +20,13 @@ export default function WorkerApp(props: { userId: string }) {
 
   // LOKACIJA: spremamo zadnju poznatu lokaciju da obavijesti stižu za ponude u krugu 30 km
   const updateLocation = useCallback(async () => {
+    // korisnik je u Profilu → Privatnost možda isključio korištenje lokacije
+    const { data: w } = await supabase.from('worker_profiles').select('share_location').eq('user_id', props.userId).maybeSingle();
+    if (w && w.share_location === false) {
+      setLocAsked(true);
+      setLoc(null);
+      return;
+    }
     const l = await getMyLocation();
     setLocAsked(true);
     setLoc(l);
@@ -56,7 +63,7 @@ export default function WorkerApp(props: { userId: string }) {
         {tab === 'feed' && <FeedScreen userId={props.userId} loc={loc} locAsked={locAsked} onRequestLocation={updateLocation} />}
         {tab === 'apps' && <ApplicationsScreen userId={props.userId} refreshKey={refreshKey} />}
         {tab === 'licences' && <LicencesScreen userId={props.userId} />}
-        {tab === 'profile' && <WorkerProfileScreen userId={props.userId} refreshKey={refreshKey} />}
+        {tab === 'profile' && <WorkerProfileScreen userId={props.userId} refreshKey={refreshKey} onLocationChanged={updateLocation} />}
       </View>
       <TabBar
         tabs={[

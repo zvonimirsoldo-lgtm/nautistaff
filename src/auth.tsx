@@ -6,6 +6,7 @@ export type Profile = {
   id: string;
   role: 'worker' | 'employer' | 'admin';
   full_name: string;
+  terms_version: string | null;
 };
 
 type AuthState = {
@@ -34,7 +35,7 @@ export function AuthProvider(props: { children: React.ReactNode }) {
       return;
     }
     const { data, error } = await supabase
-      .from('profiles').select('id, role, full_name').eq('id', s.user.id).maybeSingle();
+      .from('profiles').select('id, role, full_name, terms_version').eq('id', s.user.id).maybeSingle();
     if (error || !data) {
       setProfile(null);
       setProfileError(error?.message ?? 'Profil nije pronađen. Je li datoteka 01_baza.sql pokrenuta u Supabaseu?');

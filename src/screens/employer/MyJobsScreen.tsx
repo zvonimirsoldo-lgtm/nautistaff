@@ -7,9 +7,12 @@ import { openStored } from '../../files';
 import { C } from '../../theme';
 import { errorText, formatCountdown, formatPay, formatRange, one, parseTs, useNow } from '../../utils';
 import type { RepostData } from './PostJobScreen';
+import ReportModal, { ReportTarget } from '../../report';
+import { VERIFIED_NOTICE } from '../../legal';
 
 type Applicant = {
   id: string;
+  worker_id: string;
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'cancelled' | 'closed';
   created_at: string;
   profiles: {
@@ -63,6 +66,7 @@ export default function MyJobsScreen(props: {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [view, setView] = useState<'current' | 'archive'>('current');
+  const [report, setReport] = useState<ReportTarget>(null);
   const now = useNow(1000);
 
   const load = useCallback(async () => {
@@ -70,7 +74,7 @@ export default function MyJobsScreen(props: {
       .from('jobs')
       .select(`id, title, category, vessel, location_name, lat, lng, start_at, end_at, duration, licence, tips, is_live,
                pay_amount, pay_unit, spots, filled, status, expires_at, is_vip,
-               applications(id, status, created_at, profiles(full_name, worker_profiles(title, rating, verified, languages, experience_years, cv_path)))`)
+               applications(id, worker_id, status, created_at, profiles(full_name, worker_profiles(title, rating, verified, languages, experience_years, cv_path)))`)
       .eq('company_id', props.companyId)
       .order('start_at', { ascending: true });
     if (error) Alert.alert('Greška pri učitavanju', error.message);
@@ -174,6 +178,9 @@ export default function MyJobsScreen(props: {
                     <Text style={{ color: C.muted, fontSize: 11, fontWeight: '800', marginBottom: 6 }}>
                       {view === 'current' ? `KANDIDATI (${apps.length})` : 'ANGAŽIRANA POSADA'}
                     </Text>
+                    {apps.some((a) => one(a.profiles?.worker_profiles)?.verified) ? (
+                      <Text style={{ color: C.dim, fontSize: 11, marginBottom: 6 }}>{VERIFIED_NOTICE}</Text>
+                    ) : null}
                     {apps.length === 0
                       ? <Text style={{ color: C.dim, fontSize: 12 }}>{open ? 'Čekamo prve kandidate… stižu automatski.' : 'Nije bilo prijava.'}</Text>
                       : apps.map((a) => {
@@ -211,6 +218,10 @@ export default function MyJobsScreen(props: {
                                 </Text>
                               )}
                               {a.status === 'accepted' ? <ContactBox applicationId={a.id} label="KONTAKT KANDIDATA" /> : null}
+                              <Text
+                                onPress={() => setReport({ userId: a.worker_id, label: `Kandidat: ${a.profiles?.full_name ?? ''}` })}
+                                style={{ color: C.dim, fontSize: 11, marginTop: 6, alignSelf: 'flex-end' }}
+                              >⚑ Prijavi korisnika</Text>
                             </View>
                           );
                         })}
@@ -224,6 +235,7 @@ export default function MyJobsScreen(props: {
               </Card>
             );
           })}
+      <ReportModal target={report} onClose={() => setReport(null)} />
     </Screen>
   );
 }

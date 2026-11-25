@@ -6,6 +6,7 @@ import { getMyLocation } from '../../location';
 import { PLACES } from '../../places';
 import { C } from '../../theme';
 import { CATEGORIES, daysLabel, errorText, formatRange, parseTs } from '../../utils';
+import { EMPLOYER_NOTICE } from '../../legal';
 
 const DAY_NAMES = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub'];
 
@@ -180,6 +181,9 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
       <Toggle label="Uz plaću idu napojnice" value={tips} onChange={setTips} />
       <Toggle label="⚡ Hitna ponuda (LIVE oznaka)" value={isLive} onChange={setIsLive} />
 
+      <View style={{ marginTop: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
+        <Text style={{ color: C.muted, fontSize: 11, lineHeight: 16 }}>⚖️ {EMPLOYER_NOTICE}</Text>
+      </View>
       <Btn title="OBJAVI PONUDU 🚀" onPress={post} loading={busy} style={{ marginTop: 10 }} />
       <Text style={{ color: C.dim, fontSize: 11, marginTop: 8 }}>
         Ponuda se odmah pojavljuje u aplikaciji, a posada u krugu 30 km koja radi to zanimanje dobiva push obavijest.
