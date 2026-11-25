@@ -7,20 +7,17 @@ import { PLACES } from '../../places';
 import { C } from '../../theme';
 import { CATEGORIES, daysLabel, errorText, formatRange, parseTs } from '../../utils';
 import { EMPLOYER_NOTICE } from '../../legal';
+import DatePickerModal from '../../datePicker';
 
-const DAY_NAMES = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub'];
+const DAY_NAMES = ['ned', 'pon', 'uto', 'sri', 'čet', 'pet', 'sub'];
+const MAX_MONTHS_AHEAD = 6;
 
-function dayOptions() {
-  const out: { value: number; label: string }[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const label = i === 0 ? 'Danas' : i === 1 ? 'Sutra' : `${DAY_NAMES[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
-    out.push({ value: i, label });
-  }
-  return out;
+// npr. "sub 14.3.2027."
+function dateLabel(d: Date) {
+  return `${DAY_NAMES[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}.`;
 }
 
+// rok za prijave u minutama; 0 = do polaska
 const DEADLINES = [
   { value: 30, label: '30 min' },
   { value: 60, label: '1 sat' },
@@ -28,6 +25,10 @@ const DEADLINES = [
   { value: 360, label: '6 sati' },
   { value: 1440, label: '24 sata' },
   { value: 4320, label: '3 dana' },
+  { value: 10080, label: '7 dana' },
+  { value: 20160, label: '14 dana' },
+  { value: 43200, label: '30 dana' },
+  { value: 0, label: 'Do polaska' },
 ];
 
 // Podaci starog oglasa za "Objavi ponovno"
@@ -67,7 +68,18 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
   const [place, setPlace] = useState(prePlace?.place ?? 'Split');   // ime mjesta iz popisa ili 'gps'
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(prePlace?.gps ?? null);
   const [location, setLocation] = useState(prePlace?.detail ?? '');   // detalj: marina / vez
-  const [day, setDay] = useState(1);
+  // DAN POLASKA: danas, sutra ili datum iz kalendara (do 6 mjeseci unaprijed)
+  const [dayMode, setDayMode] = useState<'today' | 'tomorrow' | 'pick'>('tomorrow');
+  const [picked, setPicked] = useState<Date | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const maxDate = new Date(today0); maxDate.setMonth(maxDate.getMonth() + MAX_MONTHS_AHEAD);
+  const startDay = (): Date | null => {
+    if (dayMode === 'pick') return picked;
+    const d = new Date(today0);
+    if (dayMode === 'tomorrow') d.setDate(d.getDate() + 1);
+    return d;
+  };
   const [time, setTime] = useState(preStart ? `${pad(preStart.getHours())}:${pad(preStart.getMinutes())}` : '17:00');
   const [days, setDays] = useState(String(preDays));   // trajanje u danima (za kalendar i provjeru preklapanja)
   const [spots, setSpots] = useState(String(pre?.spots ?? 1));
@@ -87,15 +99,17 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
     if (!(payNum > 0)) return Alert.alert('Upišite plaću kao broj, npr. 180');
     const spotsNum = Math.max(1, Math.min(50, parseInt(spots, 10) || 1));
 
-    const start = new Date();
-    start.setDate(start.getDate() + day);
+    const sd = startDay();
+    if (!sd) return Alert.alert('Odaberite datum polaska u kalendaru.');
+    const start = new Date(sd);
     start.setHours(Number(m[1]), Number(m[2]), 0, 0);
     const daysNum = parseInt(days, 10);
     if (!(daysNum >= 1 && daysNum <= 365)) return Alert.alert('Trajanje upišite kao broj dana (1–365).');
     const end = new Date(start);
     end.setDate(end.getDate() + daysNum);
     if (start.getTime() < Date.now()) return Alert.alert('Polazak je u prošlosti. Odaberite kasnije vrijeme.');
-    const expires = new Date(Date.now() + deadline * 60 * 1000);
+    // "Do polaska" = prijave otvorene sve do trenutka polaska (baza ionako skraćuje rok do polaska)
+    const expires = deadline === 0 ? new Date(start) : new Date(Date.now() + deadline * 60 * 1000);
 
     const p = PLACES.find((x) => x.name === place);
     const coords = place === 'gps' ? gps : p ? { lat: p.lat, lng: p.lng } : null;
@@ -159,13 +173,34 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
         }}
       />
       <Field label="Marina / vez (neobavezno)" value={location} onChangeText={setLocation} placeholder="npr. ACI Marina, vez B12" />
-      <Chips label="Dan polaska" options={dayOptions()} value={day} onChange={setDay} />
+      <Chips
+        label="Dan polaska"
+        options={[
+          { value: 'today', label: 'Danas' },
+          { value: 'tomorrow', label: 'Sutra' },
+          { value: 'pick', label: dayMode === 'pick' && picked ? `📅 ${dateLabel(picked)}` : '📅 Odaberi datum' },
+        ]}
+        value={dayMode}
+        onChange={(v) => {
+          if (v === 'pick') setPickerOpen(true);
+          else setDayMode(v);
+        }}
+      />
+      <DatePickerModal
+        visible={pickerOpen}
+        value={picked}
+        min={today0}
+        max={maxDate}
+        title="Datum polaska (do 6 mjeseci unaprijed)"
+        onPick={(d) => { setPicked(d); setDayMode('pick'); }}
+        onClose={() => setPickerOpen(false)}
+      />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}><Field label="Sat polaska" value={time} onChangeText={setTime} placeholder="17:00" /></View>
         <View style={{ flex: 1 }}><Field label="Trajanje (dana)" value={days} onChangeText={setDays} keyboardType="number-pad" maxLength={3} placeholder="7" /></View>
         <View style={{ flex: 1 }}><Field label="Broj osoba" value={spots} onChangeText={setSpots} keyboardType="number-pad" /></View>
       </View>
-      <PeriodPreview day={day} time={time} days={days} />
+      <PeriodPreview start={startDay()} time={time} days={days} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}><Field label="Plaća (€)" value={pay} onChangeText={setPay} keyboardType="decimal-pad" placeholder="180" /></View>
         <View style={{ flex: 1.4 }}>
@@ -193,12 +228,11 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
 }
 
 // Prikaz razdoblja posla dok poslodavac ispunjava obrazac, npr. "sub 29.11. 17:00 → sub 6.12. 17:00"
-function PeriodPreview(props: { day: number; time: string; days: string }) {
+function PeriodPreview(props: { start: Date | null; time: string; days: string }) {
   const m = props.time.trim().match(/^(\d{1,2})[:.](\d{2})$/);
   const n = parseInt(props.days, 10);
-  if (!m || !(n >= 1 && n <= 365)) return null;
-  const start = new Date();
-  start.setDate(start.getDate() + props.day);
+  if (!props.start || !m || !(n >= 1 && n <= 365)) return null;
+  const start = new Date(props.start);
   start.setHours(Number(m[1]), Number(m[2]), 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + n);
