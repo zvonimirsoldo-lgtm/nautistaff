@@ -5,7 +5,7 @@ import { Btn, Chips, Field, Screen, Title, Toggle } from '../../components';
 import { getMyLocation } from '../../location';
 import { PLACES } from '../../places';
 import { C } from '../../theme';
-import { CATEGORIES, daysLabel, errorText, formatRange } from '../../utils';
+import { CATEGORIES, daysLabel, errorText, formatRange, parseTs } from '../../utils';
 
 const DAY_NAMES = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub'];
 
@@ -29,22 +29,52 @@ const DEADLINES = [
   { value: 4320, label: '3 dana' },
 ];
 
-export default function PostJobScreen(props: { companyId: string; onPosted: () => void }) {
-  const [category, setCategory] = useState('skipper');
-  const [title, setTitle] = useState('');
-  const [vessel, setVessel] = useState('Katamaran');
-  const [place, setPlace] = useState('Split');   // ime mjesta iz popisa ili 'gps'
-  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
-  const [location, setLocation] = useState('');   // detalj: marina / vez
+// Podaci starog oglasa za "Objavi ponovno"
+export type RepostData = {
+  category: string; title: string; vessel: string; location_name: string;
+  lat: number | null; lng: number | null; start_at: string; end_at: string;
+  spots: number; pay_amount: number; pay_unit: string; licence: string; tips: boolean; is_live: boolean;
+};
+
+const VESSELS = ['Katamaran', 'Jedrilica', 'Motorna jahta', 'Mini cruiser', 'Gulet'];
+
+// Iz starog oglasa izvuci mjesto s popisa (ili GPS) i detalj (marina / vez)
+function placeFrom(r: RepostData): { place: string; gps: { lat: number; lng: number } | null; detail: string } {
+  if (r.lat != null && r.lng != null) {
+    const p = PLACES.find((x) => Math.abs(x.lat - r.lat!) < 0.001 && Math.abs(x.lng - r.lng!) < 0.001);
+    if (p) {
+      const suffix = `, ${p.name}`;
+      const detail = r.location_name === p.name ? ''
+        : r.location_name.endsWith(suffix) ? r.location_name.slice(0, -suffix.length) : r.location_name;
+      return { place: p.name, gps: null, detail };
+    }
+    return { place: 'gps', gps: { lat: r.lat, lng: r.lng }, detail: r.location_name };
+  }
+  return { place: 'Split', gps: null, detail: r.location_name };
+}
+
+export default function PostJobScreen(props: { companyId: string; onPosted: () => void; prefill?: RepostData | null }) {
+  const pre = props.prefill ?? null;
+  const prePlace = pre ? placeFrom(pre) : null;
+  const preStart = pre ? new Date(parseTs(pre.start_at)) : null;
+  const preDays = pre ? Math.max(1, Math.round((parseTs(pre.end_at) - parseTs(pre.start_at)) / 86400000)) : 7;
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  const [category, setCategory] = useState(pre?.category ?? 'skipper');
+  const [title, setTitle] = useState(pre?.title ?? '');
+  const [vessel, setVessel] = useState(pre?.vessel || 'Katamaran');
+  const [place, setPlace] = useState(prePlace?.place ?? 'Split');   // ime mjesta iz popisa ili 'gps'
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(prePlace?.gps ?? null);
+  const [location, setLocation] = useState(prePlace?.detail ?? '');   // detalj: marina / vez
   const [day, setDay] = useState(1);
-  const [time, setTime] = useState('17:00');
-  const [days, setDays] = useState('7');   // trajanje u danima (za kalendar i provjeru preklapanja)
-  const [spots, setSpots] = useState('1');
-  const [pay, setPay] = useState('');
-  const [payUnit, setPayUnit] = useState('day');
-  const [licence, setLicence] = useState('');
-  const [tips, setTips] = useState(true);
-  const [isLive, setIsLive] = useState(true);
+  const [time, setTime] = useState(preStart ? `${pad(preStart.getHours())}:${pad(preStart.getMinutes())}` : '17:00');
+  const [days, setDays] = useState(String(preDays));   // trajanje u danima (za kalendar i provjeru preklapanja)
+  const [spots, setSpots] = useState(String(pre?.spots ?? 1));
+  const [pay, setPay] = useState(pre ? String(Math.round(Number(pre.pay_amount))) : '');
+  const [payUnit, setPayUnit] = useState(pre?.pay_unit ?? 'day');
+  const [licence, setLicence] = useState(pre?.licence ?? '');
+  const [tips, setTips] = useState(pre?.tips ?? true);
+  const [isLive, setIsLive] = useState(pre?.is_live ?? true);
   const [deadline, setDeadline] = useState(120);
   const [busy, setBusy] = useState(false);
 
@@ -100,12 +130,17 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
 
   return (
     <Screen>
-      <Title>Nova ponuda</Title>
+      <Title>{pre ? '🔁 Ponovna objava' : 'Nova ponuda'}</Title>
+      {pre ? (
+        <Text style={{ color: C.sky, fontSize: 12, marginBottom: 12 }}>
+          Podaci su preuzeti iz oglasa „{pre.title}". Odaberite novi dan polaska i provjerite ostalo.
+        </Text>
+      ) : null}
       <Chips label="Zanimanje" options={CATEGORIES.map((c) => ({ value: c.id, label: c.name }))} value={category} onChange={setCategory} />
       <Field label="Naslov oglasa" value={title} onChangeText={setTitle} maxLength={80} placeholder="npr. Skiper za tjedni čarter, hitno" />
       <Chips
         label="Plovilo"
-        options={['Katamaran', 'Jedrilica', 'Motorna jahta', 'Mini cruiser', 'Gulet'].map((v) => ({ value: v, label: v }))}
+        options={(VESSELS.includes(vessel) ? VESSELS : [vessel, ...VESSELS]).map((v) => ({ value: v, label: v }))}
         value={vessel}
         onChange={setVessel}
       />
@@ -138,6 +173,9 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
       </View>
       <Field label="Tražene licence / uvjeti (neobavezno)" value={licence} onChangeText={setLicence} placeholder="npr. voditelj brodice, engleski B2" />
       <Chips label="Rok za prijave (odbrojavanje)" options={DEADLINES} value={deadline} onChange={setDeadline} />
+      <Text style={{ color: C.dim, fontSize: 11, marginTop: -6, marginBottom: 10 }}>
+        Rok za prijave nikad nije kasniji od polaska. Kandidata možete prihvatiti i nakon roka, sve do polaska.
+      </Text>
 
       <Toggle label="Uz plaću idu napojnice" value={tips} onChange={setTips} />
       <Toggle label="⚡ Hitna ponuda (LIVE oznaka)" value={isLive} onChange={setIsLive} />

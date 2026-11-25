@@ -73,7 +73,9 @@ export default function FeedScreen(props: {
     load();
   }
 
-  const visible = jobs.filter((j) => parseTs(j.expires_at) > now && (cat === 'all' || j.category === cat));
+  // aktivne ponude (dok traje rok) + nedavno popunjene (prigušene, na dnu)
+  const visible = jobs.filter((j) => (j.job_status === 'filled' || parseTs(j.expires_at) > now) && (cat === 'all' || j.category === cat));
+  const activeCount = visible.filter((j) => j.job_status !== 'filled').length;
 
   return (
     <Screen refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}>
@@ -93,7 +95,7 @@ export default function FeedScreen(props: {
       ) : null}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <Text style={{ color: C.text, fontWeight: '900', fontSize: 15 }}>🔴 Live ponude</Text>
-        <Text style={{ color: C.sky, fontSize: 12, fontWeight: '700' }}>{visible.length} aktivnih</Text>
+        <Text style={{ color: C.sky, fontSize: 12, fontWeight: '700' }}>{activeCount} aktivnih</Text>
       </View>
       {loading ? <Empty text="Učitavanje…" />
         : visible.length === 0 ? <Empty text={radius > 0 ? `Nema ponuda u krugu ${radius} km. Probajte veći krug.` : 'Trenutno nema aktivnih ponuda. Nove stižu automatski.'} />

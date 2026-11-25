@@ -8,7 +8,7 @@ import { errorText } from '../../utils';
 import { logout } from '../../push';
 import CompanySetupScreen from './CompanySetupScreen';
 import MyJobsScreen from './MyJobsScreen';
-import PostJobScreen from './PostJobScreen';
+import PostJobScreen, { RepostData } from './PostJobScreen';
 
 type Company = { id: string; owner_id: string; name: string; fleet: string; base: string; verified: boolean; package: string; rating: number | null };
 type Tab = 'jobs' | 'post' | 'company';
@@ -19,6 +19,7 @@ export default function EmployerApp(props: { userId: string }) {
   const [tab, setTab] = useState<Tab>('jobs');
   const [refreshKey, setRefreshKey] = useState(0);
   const [news, setNews] = useState(0);
+  const [repost, setRepost] = useState<{ data: RepostData; n: number } | null>(null);
   const toast = useToast();
 
   const loadCompany = useCallback(async () => {
@@ -55,11 +56,20 @@ export default function EmployerApp(props: { userId: string }) {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        {tab === 'jobs' && <MyJobsScreen companyId={company.id} companyName={company.name} refreshKey={refreshKey} />}
+        {tab === 'jobs' && (
+          <MyJobsScreen
+            companyId={company.id}
+            companyName={company.name}
+            refreshKey={refreshKey}
+            onRepost={(data) => { setRepost((r) => ({ data, n: (r?.n ?? 0) + 1 })); setTab('post'); }}
+          />
+        )}
         {tab === 'post' && (
           <PostJobScreen
+            key={repost ? `repost-${repost.n}` : 'new'}
             companyId={company.id}
-            onPosted={() => { toast('🚀 Ponuda objavljena. Posada je vidi odmah.'); setTab('jobs'); setRefreshKey((k) => k + 1); }}
+            prefill={repost?.data ?? null}
+            onPosted={() => { toast('🚀 Ponuda objavljena. Posada je vidi odmah.'); setRepost(null); setTab('jobs'); setRefreshKey((k) => k + 1); }}
           />
         )}
         {tab === 'company' && <CompanyScreen company={company} onSaved={loadCompany} />}
@@ -71,7 +81,7 @@ export default function EmployerApp(props: { userId: string }) {
           { id: 'company', label: '⛵ Tvrtka' },
         ]}
         active={tab}
-        onChange={(t) => { setTab(t); if (t === 'jobs') setNews(0); }}
+        onChange={(t) => { setTab(t); if (t === 'jobs') setNews(0); if (t === 'post') setRepost(null); }}
       />
     </View>
   );
