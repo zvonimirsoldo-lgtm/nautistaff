@@ -5,6 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth';
 import { Btn, ToastProvider } from './src/components';
 import { logout, registerForPush } from './src/push';
+import { useAutoUpdate } from './src/updates';
 import { C } from './src/theme';
 import AuthScreen from './src/screens/AuthScreen';
 import WorkerApp from './src/screens/worker/WorkerApp';
@@ -20,10 +21,24 @@ export default function App() {
             <StatusBar style="light" />
             <Header />
             <Root />
+            <UpdateOverlay />
           </SafeAreaView>
         </ToastProvider>
       </AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+// Dok se preuzima nova verzija, preko cijelog ekrana kratko piše da se aplikacija ažurira
+function UpdateOverlay() {
+  const installing = useAutoUpdate();
+  if (!installing) return null;
+  return (
+    <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(2,6,23,0.92)', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+      <ActivityIndicator color={C.sky} size="large" />
+      <Text style={{ color: C.text, fontWeight: '800', fontSize: 16, marginTop: 14 }}>Instalira se nova verzija…</Text>
+      <Text style={{ color: C.muted, marginTop: 4 }}>Traje nekoliko sekundi.</Text>
+    </View>
   );
 }
 

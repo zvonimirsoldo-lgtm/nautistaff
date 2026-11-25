@@ -5,6 +5,7 @@ import { Badge, Btn, Card, Empty, Screen, TabBar, Title, useToast } from '../../
 import { openStored } from '../../files';
 import { logout } from '../../push';
 import { C } from '../../theme';
+import { versionLabel } from '../../updates';
 import { errorText } from '../../utils';
 
 type Tab = 'certs' | 'companies';
@@ -84,6 +85,7 @@ export default function AdminApp() {
           </>
         )}
         <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />
+        <Text style={{ color: C.dim, fontSize: 10, textAlign: 'center', marginTop: 12 }}>Verzija aplikacije: {versionLabel()}</Text>
       </Screen>
       <TabBar
         tabs={[

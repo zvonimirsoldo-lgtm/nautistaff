@@ -6,6 +6,7 @@ import { useAuth } from '../../auth';
 import { openStored, pickFile, uploadFile } from '../../files';
 import { logout } from '../../push';
 import { C } from '../../theme';
+import { versionLabel } from '../../updates';
 import { CATEGORIES, errorText } from '../../utils';
 
 export default function WorkerProfileScreen(props: { userId: string }) {
@@ -133,6 +134,7 @@ export default function WorkerProfileScreen(props: { userId: string }) {
 
       <Btn title="Spremi profil" variant="green" onPress={save} loading={saving} />
       <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />
+      <Text style={{ color: C.dim, fontSize: 10, textAlign: 'center', marginTop: 12 }}>Verzija aplikacije: {versionLabel()}</Text>
     </Screen>
   );
 }

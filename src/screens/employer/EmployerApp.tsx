@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { supabase } from '../../supabase';
 import { Btn, Card, Field, Screen, TabBar, Title, useToast } from '../../components';
 import { C } from '../../theme';
+import { versionLabel } from '../../updates';
 import { errorText } from '../../utils';
 import { logout } from '../../push';
 import CompanySetupScreen from './CompanySetupScreen';
@@ -119,6 +120,7 @@ function CompanyScreen(props: { company: Company; onSaved: () => void }) {
       <Field label="Kontakt mobitel (vidi ga samo kandidat kojeg prihvatite)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="npr. 098 765 4321" />
       <Btn title="Spremi" variant="green" onPress={save} loading={saving} />
       <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />
+      <Text style={{ color: C.dim, fontSize: 10, textAlign: 'center', marginTop: 12 }}>Verzija aplikacije: {versionLabel()}</Text>
     </Screen>
   );
 }
