@@ -20,6 +20,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b1577bd6-e65a-463e-8f45-242fd9909dfb"
+      }
+    },
+    "owner": "zvonimir11"
   }
 }

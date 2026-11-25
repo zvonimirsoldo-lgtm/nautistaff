@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth';
 import { Btn, ToastProvider } from './src/components';
-import { supabase } from './src/supabase';
+import { logout, registerForPush } from './src/push';
 import { C } from './src/theme';
 import AuthScreen from './src/screens/AuthScreen';
 import WorkerApp from './src/screens/worker/WorkerApp';
 import EmployerApp from './src/screens/employer/EmployerApp';
+import AdminApp from './src/screens/admin/AdminApp';
 
 export default function App() {
   return (
@@ -46,6 +47,11 @@ function Header() {
 function Root() {
   const { session, profile, loading, profileError, reloadProfile } = useAuth();
 
+  // PUSH: nakon prijave registriramo ovaj mobitel za obavijesti
+  useEffect(() => {
+    if (profile?.id) registerForPush();
+  }, [profile?.id]);
+
   if (loading) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.sky} size="large" /></View>;
   }
@@ -57,12 +63,13 @@ function Root() {
         <Text style={{ color: C.text, fontSize: 16, fontWeight: '800', marginBottom: 8 }}>Profil se ne može učitati</Text>
         <Text style={{ color: C.muted, marginBottom: 16 }}>{profileError ?? 'Učitavanje…'}</Text>
         <Btn title="Pokušaj ponovno" onPress={reloadProfile} />
-        <Btn title="Odjava" variant="ghost" onPress={() => supabase.auth.signOut()} style={{ marginTop: 10 }} />
+        <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 10 }} />
       </View>
     );
   }
 
   // key={userId} osigurava čisti početak kad se na istom mobitelu prijavi drugi korisnik
+  if (profile.role === 'admin') return <AdminApp key={profile.id} />;
   if (profile.role === 'employer') return <EmployerApp key={profile.id} userId={profile.id} />;
   return <WorkerApp key={profile.id} userId={profile.id} />;
 }

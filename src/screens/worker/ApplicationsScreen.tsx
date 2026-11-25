@@ -4,6 +4,7 @@ import { supabase } from '../../supabase';
 import { Badge, Btn, Card, Empty, Screen, Title } from '../../components';
 import { C } from '../../theme';
 import { errorText, formatDateTime, formatPay, one } from '../../utils';
+import ContactBox from '../../contact';
 
 type Row = {
   id: string;
@@ -66,9 +67,12 @@ export default function ApplicationsScreen(props: { userId: string; refreshKey: 
                 </Text>
                 {job ? <Text style={{ color: C.muted, fontSize: 12 }}>📅 {formatDateTime(job.start_at)} · {formatPay(job.pay_amount, job.pay_unit)}</Text> : null}
                 {r.status === 'accepted' && (
-                  <Text style={{ color: C.green, fontSize: 12, marginTop: 6 }}>
-                    🎉 Poslodavac vas je odabrao. Kontakt i chat dolaze u sljedećoj verziji.
-                  </Text>
+                  <>
+                    <Text style={{ color: C.green, fontSize: 12, marginTop: 6 }}>
+                      🎉 Poslodavac vas je odabrao. Javite se za dogovor oko ukrcaja:
+                    </Text>
+                    <ContactBox applicationId={r.id} label="KONTAKT POSLODAVCA" />
+                  </>
                 )}
                 {r.status === 'pending' && (
                   <Btn title="Povuci prijavu" small variant="ghost" onPress={() => withdraw(r.id)} style={{ marginTop: 8, alignSelf: 'flex-end' }} />

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput,
   TextInputProps, View, ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,6 +68,54 @@ export function Chips<T extends string | number>(props: {
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+// ---------- Odabir više opcija ----------
+export function MultiChips(props: {
+  label?: string; options: { value: string; label: string }[]; values: string[]; onChange: (v: string[]) => void;
+}) {
+  return (
+    <View style={{ marginBottom: 10 }}>
+      {props.label ? <Text style={s.label}>{props.label}</Text> : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+        {props.options.map((o) => {
+          const active = props.values.includes(o.value);
+          return (
+            <Pressable
+              key={o.value}
+              onPress={() => props.onChange(active ? props.values.filter((v) => v !== o.value) : [...props.values, o.value])}
+              style={[s.chip, { marginBottom: 6 }, active && { backgroundColor: C.skyDark, borderColor: C.sky }]}
+            >
+              <Text style={[s.chipText, active && { color: C.bg }]}>{active ? '✓ ' : ''}{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ---------- Prekidač ----------
+export function Toggle(props: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <Text style={{ color: C.text, fontSize: 13, flex: 1, marginRight: 8 }}>{props.label}</Text>
+      <Switch value={props.value} onValueChange={props.onChange} trackColor={{ true: C.skyDark, false: C.border }} />
+    </View>
+  );
+}
+
+// ---------- Plava značka verificiranog profila ----------
+export function VerifiedBadge(props: { small?: boolean }) {
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
+      backgroundColor: 'rgba(56,189,248,0.15)', borderColor: C.sky, borderWidth: 1, borderRadius: 20,
+      paddingHorizontal: props.small ? 6 : 10, paddingVertical: props.small ? 1 : 3,
+    }}>
+      <Text style={{ color: C.sky, fontWeight: '900', fontSize: props.small ? 10 : 12 }}>✔ VERIFICIRAN</Text>
     </View>
   );
 }

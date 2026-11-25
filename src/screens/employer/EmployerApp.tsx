@@ -4,11 +4,12 @@ import { supabase } from '../../supabase';
 import { Btn, Card, Field, Screen, TabBar, Title, useToast } from '../../components';
 import { C } from '../../theme';
 import { errorText } from '../../utils';
+import { logout } from '../../push';
 import CompanySetupScreen from './CompanySetupScreen';
 import MyJobsScreen from './MyJobsScreen';
 import PostJobScreen from './PostJobScreen';
 
-type Company = { id: string; name: string; fleet: string; base: string; verified: boolean; package: string; rating: number | null };
+type Company = { id: string; owner_id: string; name: string; fleet: string; base: string; verified: boolean; package: string; rating: number | null };
 type Tab = 'jobs' | 'post' | 'company';
 
 export default function EmployerApp(props: { userId: string }) {
@@ -80,13 +81,20 @@ function CompanyScreen(props: { company: Company; onSaved: () => void }) {
   const [name, setName] = useState(c.name);
   const [fleet, setFleet] = useState(c.fleet);
   const [base, setBase] = useState(c.base);
+  const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    supabase.from('private_contacts').select('phone').maybeSingle().then(({ data }) => setPhone(data?.phone ?? ''));
+  }, []);
 
   async function save() {
     setSaving(true);
     const { error } = await supabase.from('companies').update({ name: name.trim(), fleet: fleet.trim(), base: base.trim() }).eq('id', c.id);
+    const r2 = error ? null : await supabase.from('private_contacts').upsert({ user_id: c.owner_id, phone: phone.trim(), updated_at: new Date().toISOString() });
     setSaving(false);
+    if (r2?.error) return Alert.alert('Greška', errorText(r2.error));
     if (error) Alert.alert('Greška', errorText(error));
     else { toast('💾 Spremljeno'); props.onSaved(); }
   }
@@ -108,8 +116,9 @@ function CompanyScreen(props: { company: Company; onSaved: () => void }) {
       <Field label="Naziv tvrtke" value={name} onChangeText={setName} />
       <Field label="Flota" value={fleet} onChangeText={setFleet} />
       <Field label="Baza / marina" value={base} onChangeText={setBase} />
+      <Field label="Kontakt mobitel (vidi ga samo kandidat kojeg prihvatite)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="npr. 098 765 4321" />
       <Btn title="Spremi" variant="green" onPress={save} loading={saving} />
-      <Btn title="Odjava" variant="ghost" onPress={() => supabase.auth.signOut()} style={{ marginTop: 24 }} />
+      <Btn title="Odjava" variant="ghost" onPress={logout} style={{ marginTop: 24 }} />
     </Screen>
   );
 }

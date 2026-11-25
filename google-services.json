@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "260095211011",
+    "project_id": "nautistaff-29117",
+    "storage_bucket": "nautistaff-29117.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:260095211011:android:30bf4c3d24486702884036",
+        "android_client_info": {
+          "package_name": "hr.nautistaff.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4B17NnsNO3-9l87huoA6UxVeZM3CeSvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

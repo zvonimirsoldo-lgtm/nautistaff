@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { supabase } from '../../supabase';
-import { Badge, Btn, Card, Empty, Screen, Title } from '../../components';
+import { Badge, Btn, Card, Empty, Screen, Title, VerifiedBadge } from '../../components';
+import ContactBox from '../../contact';
+import { openStored } from '../../files';
 import { C } from '../../theme';
 import { errorText, formatCountdown, formatDateTime, formatPay, one, parseTs, useNow } from '../../utils';
 
@@ -14,7 +16,7 @@ type Applicant = {
     worker_profiles: WP | WP[] | null;
   } | null;
 };
-type WP = { title: string; rating: number | null; verified: boolean; languages: string };
+type WP = { title: string; rating: number | null; verified: boolean; languages: string; experience_years: number | null; cv_path: string | null };
 
 type Job = {
   id: string; title: string; location_name: string; start_at: string; pay_amount: number; pay_unit: string;
@@ -40,7 +42,7 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
     const { data, error } = await supabase
       .from('jobs')
       .select(`id, title, location_name, start_at, pay_amount, pay_unit, spots, filled, status, expires_at, is_vip,
-               applications(id, status, created_at, profiles(full_name, worker_profiles(title, rating, verified, languages)))`)
+               applications(id, status, created_at, profiles(full_name, worker_profiles(title, rating, verified, languages, experience_years, cv_path)))`)
       .eq('company_id', props.companyId)
       .order('created_at', { ascending: false });
     if (error) Alert.alert('Greška pri učitavanju', error.message);
@@ -112,12 +114,22 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
                             backgroundColor: C.bg, borderColor: C.border, borderWidth: 1, borderRadius: 12,
                             padding: 10, marginBottom: 6, opacity: a.status === 'rejected' ? 0.5 : 1,
                           }}>
-                            <Text style={{ color: C.text, fontWeight: '800' }}>
-                              {a.profiles?.full_name || 'Kandidat'} {wp?.verified ? <Text style={{ color: C.sky }}>✔</Text> : null}
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                              <Text style={{ color: C.text, fontWeight: '800' }}>{a.profiles?.full_name || 'Kandidat'}</Text>
+                              {wp?.verified ? <VerifiedBadge small /> : null}
+                            </View>
                             <Text style={{ color: C.muted, fontSize: 12 }}>
-                              {wp?.title || 'Profil nije ispunjen'}{wp?.rating ? ` · ★ ${wp.rating}` : ''}{wp?.languages ? ` · ${wp.languages}` : ''}
+                              {wp?.title || 'Profil nije ispunjen'}
+                              {wp?.experience_years != null ? ` · ${wp.experience_years} god. iskustva` : ''}
+                              {wp?.rating ? ` · ★ ${wp.rating}` : ''}
                             </Text>
+                            {wp?.languages ? <Text style={{ color: C.dim, fontSize: 12 }}>🗣 {wp.languages}</Text> : null}
+                            {wp?.cv_path ? (
+                              <Btn
+                                title="📄 Otvori CV" small variant="ghost" style={{ alignSelf: 'flex-start', marginTop: 6 }}
+                                onPress={() => openStored('cv', wp.cv_path as string).catch((e) => Alert.alert('CV nije dostupan', errorText(e)))}
+                              />
+                            ) : null}
                             {a.status === 'pending' && active ? (
                               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, gap: 8 }}>
                                 <Btn title="Odbij" small variant="ghost" onPress={() => decide(a.id, false)} disabled={busy === a.id} />
@@ -131,6 +143,7 @@ export default function MyJobsScreen(props: { companyId: string; companyName: st
                                 {a.status === 'accepted' ? 'Prihvaćen' : a.status === 'rejected' ? 'Odbijen' : 'Nije odgovoreno'}
                               </Text>
                             )}
+                            {a.status === 'accepted' ? <ContactBox applicationId={a.id} label="KONTAKT KANDIDATA" /> : null}
                           </View>
                         );
                       })}

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Alert, Switch, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { supabase } from '../../supabase';
-import { Btn, Chips, Field, Screen, Title } from '../../components';
+import { Btn, Chips, Field, Screen, Title, Toggle } from '../../components';
+import { getMyLocation } from '../../location';
+import { PLACES } from '../../places';
 import { C } from '../../theme';
 import { CATEGORIES, errorText } from '../../utils';
 
@@ -31,7 +33,9 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
   const [category, setCategory] = useState('skipper');
   const [title, setTitle] = useState('');
   const [vessel, setVessel] = useState('Katamaran');
-  const [location, setLocation] = useState('');
+  const [place, setPlace] = useState('Split');   // ime mjesta iz popisa ili 'gps'
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [location, setLocation] = useState('');   // detalj: marina / vez
   const [day, setDay] = useState(1);
   const [time, setTime] = useState('17:00');
   const [duration, setDuration] = useState('7 dana');
@@ -47,7 +51,6 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
   async function post() {
     const m = time.trim().match(/^(\d{1,2})[:.](\d{2})$/);
     if (title.trim().length < 3) return Alert.alert('Upišite naslov oglasa (barem 3 znaka).');
-    if (!location.trim()) return Alert.alert('Upišite marinu ili lokaciju.');
     if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return Alert.alert('Vrijeme polaska upišite kao npr. 17:00');
     const payNum = Number(pay.replace(',', '.'));
     if (!(payNum > 0)) return Alert.alert('Upišite plaću kao broj, npr. 180');
@@ -59,13 +62,20 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
     if (start.getTime() < Date.now()) return Alert.alert('Polazak je u prošlosti. Odaberite kasnije vrijeme.');
     const expires = new Date(Date.now() + deadline * 60 * 1000);
 
+    const p = PLACES.find((x) => x.name === place);
+    const coords = place === 'gps' ? gps : p ? { lat: p.lat, lng: p.lng } : null;
+    if (place === 'gps' && !gps) return Alert.alert('Lokacija nije dostupna. Odaberite mjesto s popisa.');
+    const placeName = place === 'gps' ? (location.trim() || 'Moja lokacija') : [location.trim(), place].filter(Boolean).join(', ');
+
     setBusy(true);
     const { error } = await supabase.from('jobs').insert({
       company_id: props.companyId,
       category,
       title: title.trim(),
       vessel: vessel.trim(),
-      location_name: location.trim(),
+      location_name: placeName,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
       start_at: start.toISOString(),
       duration: duration.trim(),
       licence: licence.trim(),
@@ -94,7 +104,20 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
         value={vessel}
         onChange={setVessel}
       />
-      <Field label="Marina / lokacija" value={location} onChangeText={setLocation} placeholder="npr. ACI Marina Split" />
+      <Chips
+        label="Mjesto (za obavijesti posadi u krugu 30 km)"
+        options={[{ value: 'gps', label: '📍 Moja lokacija' }, ...PLACES.map((x) => ({ value: x.name, label: x.name }))]}
+        value={place}
+        onChange={async (v) => {
+          setPlace(v);
+          if (v === 'gps' && !gps) {
+            const l = await getMyLocation();
+            if (l) setGps(l);
+            else Alert.alert('Lokacija nije dopuštena', 'Odaberite mjesto s popisa.');
+          }
+        }}
+      />
+      <Field label="Marina / vez (neobavezno)" value={location} onChangeText={setLocation} placeholder="npr. ACI Marina, vez B12" />
       <Chips label="Dan polaska" options={dayOptions()} value={day} onChange={setDay} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}><Field label="Sat polaska" value={time} onChangeText={setTime} placeholder="17:00" /></View>
@@ -115,17 +138,8 @@ export default function PostJobScreen(props: { companyId: string; onPosted: () =
 
       <Btn title="OBJAVI PONUDU 🚀" onPress={post} loading={busy} style={{ marginTop: 10 }} />
       <Text style={{ color: C.dim, fontSize: 11, marginTop: 8 }}>
-        Ponuda se odmah pojavljuje svoj posadi koja ima otvorenu aplikaciju. Push obavijesti dolaze u sljedećoj verziji.
+        Ponuda se odmah pojavljuje u aplikaciji, a posada u krugu 30 km koja radi to zanimanje dobiva push obavijest.
       </Text>
     </Screen>
-  );
-}
-
-function Toggle(props: { label: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-      <Text style={{ color: C.text, fontSize: 13 }}>{props.label}</Text>
-      <Switch value={props.value} onValueChange={props.onChange} trackColor={{ true: C.skyDark, false: C.border }} />
-    </View>
   );
 }

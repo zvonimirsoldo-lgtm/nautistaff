@@ -1,18 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { supabase } from '../../supabase';
 import { TabBar, useToast } from '../../components';
+import { getMyLocation, LatLng } from '../../location';
 import FeedScreen from './FeedScreen';
 import ApplicationsScreen from './ApplicationsScreen';
+import LicencesScreen from './LicencesScreen';
 import WorkerProfileScreen from './WorkerProfileScreen';
 
-type Tab = 'feed' | 'apps' | 'profile';
+type Tab = 'feed' | 'apps' | 'licences' | 'profile';
 
 export default function WorkerApp(props: { userId: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [refreshKey, setRefreshKey] = useState(0);
   const [news, setNews] = useState(0);
+  const [loc, setLoc] = useState<LatLng | null>(null);
+  const [locAsked, setLocAsked] = useState(false);
   const toast = useToast();
+
+  // LOKACIJA: spremamo zadnju poznatu lokaciju da obavijesti stižu za ponude u krugu 30 km
+  const updateLocation = useCallback(async () => {
+    const l = await getMyLocation();
+    setLocAsked(true);
+    setLoc(l);
+    if (l) {
+      await supabase.from('worker_profiles').update({ lat: l.lat, lng: l.lng }).eq('user_id', props.userId);
+    }
+  }, [props.userId]);
+
+  useEffect(() => { updateLocation(); }, [updateLocation]);
 
   // REAL-TIME: kad poslodavac odgovori na moju prijavu, javi odmah (na bilo kojem ekranu)
   useEffect(() => {
@@ -23,7 +39,7 @@ export default function WorkerApp(props: { userId: string }) {
         (payload) => {
           const status = (payload.new as { status?: string }).status;
           if (status === 'accepted') {
-            toast('🎉 Prihvaćeni ste! Poslodavac vas je odabrao za posao.');
+            toast('🎉 Prihvaćeni ste! Kontakt poslodavca je pod „Prijave".');
             setNews((n) => n + 1);
           } else if (status === 'rejected') {
             toast('Poslodavac je odabrao drugog kandidata.');
@@ -37,14 +53,16 @@ export default function WorkerApp(props: { userId: string }) {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        {tab === 'feed' && <FeedScreen userId={props.userId} />}
+        {tab === 'feed' && <FeedScreen userId={props.userId} loc={loc} locAsked={locAsked} onRequestLocation={updateLocation} />}
         {tab === 'apps' && <ApplicationsScreen userId={props.userId} refreshKey={refreshKey} />}
+        {tab === 'licences' && <LicencesScreen userId={props.userId} />}
         {tab === 'profile' && <WorkerProfileScreen userId={props.userId} />}
       </View>
       <TabBar
         tabs={[
           { id: 'feed', label: '⚡ Ponude' },
           { id: 'apps', label: '📨 Prijave', badge: news },
+          { id: 'licences', label: '🪪 Licence' },
           { id: 'profile', label: '👤 Profil' },
         ]}
         active={tab}
